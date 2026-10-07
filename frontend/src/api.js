@@ -1,4 +1,4 @@
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_BASE = import.meta.env.VITE_API_URL || 'https://spendsense-1js4.onrender.com';
 
 export async function getExpenses() {
   const response = await fetch(`${API_BASE}/expenses`);
