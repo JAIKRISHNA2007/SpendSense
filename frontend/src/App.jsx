@@ -47,7 +47,7 @@ function App() {
               <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
                 SpendSense
                 <span className="text-[10px] font-semibold uppercase px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                  Feature 1
+                  Live &bull; Anomaly Engine
                 </span>
               </h1>
               <p className="text-xs text-slate-400">Intelligent Expense Management & Anomaly Detection</p>

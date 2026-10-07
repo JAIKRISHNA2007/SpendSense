@@ -1,23 +1,25 @@
 import datetime
-from database import SessionLocal, engine, Base
+from anomaly import detect_anomaly
+from database import Base, SessionLocal, engine
 from models import Expense
+
 
 def seed():
     # Ensure tables exist
     Base.metadata.create_all(bind=engine)
-    
+
     db = SessionLocal()
     try:
-        # Clear existing expenses to have a clean, consistent dataset
+        # Clear existing expenses to ensure a fresh, consistent dataset
         db.query(Expense).delete()
         db.commit()
 
         today = datetime.date.today()
 
         sample_expenses = [
-            # Food (Normal: ₹120 - ₹450)
+            # Food (Normal baseline: ₹180 - ₹340)
             {
-                "amount": 180.0,
+                "amount": 220.0,
                 "category": "Food",
                 "merchant": "Chai Point",
                 "note": "Snacks & ginger tea with colleagues",
@@ -31,21 +33,21 @@ def seed():
                 "date": today - datetime.timedelta(days=14),
             },
             {
-                "amount": 220.0,
+                "amount": 240.0,
                 "category": "Food",
                 "merchant": "Subway",
                 "note": "Veg sub combo",
                 "date": today - datetime.timedelta(days=11),
             },
             {
-                "amount": 150.0,
+                "amount": 190.0,
                 "category": "Food",
                 "merchant": "Cafe Coffee Day",
                 "note": "Cappuccino",
                 "date": today - datetime.timedelta(days=8),
             },
             {
-                "amount": 420.0,
+                "amount": 310.0,
                 "category": "Food",
                 "merchant": "Zomato",
                 "note": "Dinner pizza delivery",
@@ -59,12 +61,12 @@ def seed():
                 "date": today - datetime.timedelta(days=1),
             },
 
-            # Transport (Normal: ₹80 - ₹350)
+            # Transport (Normal: ₹90 - ₹260, Deliberate Anomaly: ₹3,400)
             {
                 "amount": 90.0,
                 "category": "Transport",
                 "merchant": "Namma Metro",
-                "note": "Smartcard monthly recharge",
+                "note": "Smartcard recharge",
                 "date": today - datetime.timedelta(days=15),
             },
             {
@@ -88,7 +90,6 @@ def seed():
                 "note": "Commute home during peak rain",
                 "date": today - datetime.timedelta(days=5),
             },
-            # Transport ANOMALY (Deliberately high: ₹3,400)
             {
                 "amount": 3400.0,
                 "category": "Transport",
@@ -97,7 +98,7 @@ def seed():
                 "date": today - datetime.timedelta(days=2),
             },
 
-            # Shopping (Normal: ₹400 - ₹1,400)
+            # Shopping (Normal: ₹550 - ₹1,250, Deliberate Anomaly: ₹8,500)
             {
                 "amount": 550.0,
                 "category": "Shopping",
@@ -119,7 +120,6 @@ def seed():
                 "note": "Ergonomic laptop stand",
                 "date": today - datetime.timedelta(days=6),
             },
-            # Shopping ANOMALY (Deliberately high: ₹8,500 electronics - section 8 example)
             {
                 "amount": 8500.0,
                 "category": "Shopping",
@@ -128,22 +128,28 @@ def seed():
                 "date": today - datetime.timedelta(days=3),
             },
 
-            # Bills (Normal: ₹600 - ₹1,600)
+            # Bills (Normal: ₹699 - ₹1,200, Deliberate Anomaly: ₹9,200)
             {
                 "amount": 699.0,
                 "category": "Bills",
                 "merchant": "Airtel Fiber",
                 "note": "Monthly broadband bill",
-                "date": today - datetime.timedelta(days=14),
+                "date": today - datetime.timedelta(days=16),
             },
             {
                 "amount": 1200.0,
                 "category": "Bills",
                 "merchant": "BESCOM Electricity",
                 "note": "Monthly residential electricity bill",
-                "date": today - datetime.timedelta(days=7),
+                "date": today - datetime.timedelta(days=10),
             },
-            # Bills ANOMALY (Deliberately high: ₹9,200)
+            {
+                "amount": 950.0,
+                "category": "Bills",
+                "merchant": "Indane Gas",
+                "note": "LPG cylinder refill",
+                "date": today - datetime.timedelta(days=6),
+            },
             {
                 "amount": 9200.0,
                 "category": "Bills",
@@ -152,7 +158,7 @@ def seed():
                 "date": today - datetime.timedelta(days=1),
             },
 
-            # Entertainment (Normal: ₹250 - ₹650)
+            # Entertainment (Normal: ₹320 - ₹499)
             {
                 "amount": 320.0,
                 "category": "Entertainment",
@@ -168,7 +174,7 @@ def seed():
                 "date": today - datetime.timedelta(days=7),
             },
 
-            # Health (Normal: ₹200 - ₹750)
+            # Health (Normal: ₹350 - ₹600)
             {
                 "amount": 350.0,
                 "category": "Health",
@@ -194,27 +200,52 @@ def seed():
             },
         ]
 
+        # Sort chronologically (oldest first) so that prior expenses form the baseline
+        sample_expenses.sort(key=lambda x: x["date"])
+
+        flagged_count = 0
         for item in sample_expenses:
+            # Query prior expenses already inserted for this category
+            prior_category_expenses = (
+                db.query(Expense)
+                .filter(Expense.category == item["category"])
+                .all()
+            )
+
+            # Compute anomaly status using anomaly detection logic
+            anomaly_data = detect_anomaly(
+                expense_amount=item["amount"],
+                category=item["category"],
+                historical_expenses=prior_category_expenses,
+            )
+
+            if anomaly_data.get("is_anomaly"):
+                flagged_count += 1
+
             expense = Expense(
                 amount=item["amount"],
                 category=item["category"],
                 merchant=item["merchant"],
                 note=item["note"],
                 date=item["date"],
-                is_anomaly=False,
-                anomaly_explanation=None,
-                z_score=None,
+                is_anomaly=anomaly_data.get("is_anomaly", False),
+                anomaly_explanation=anomaly_data.get("anomaly_explanation"),
+                z_score=anomaly_data.get("z_score"),
             )
             db.add(expense)
+            db.commit()
 
-        db.commit()
-        print(f"Successfully seeded {len(sample_expenses)} expenses into SQLite database.")
+        print(
+            f"Successfully seeded {len(sample_expenses)} expenses into SQLite database "
+            f"({flagged_count} flagged as deliberate anomalies)."
+        )
     except Exception as e:
         db.rollback()
         print(f"Error seeding database: {e}")
         raise
     finally:
         db.close()
+
 
 if __name__ == "__main__":
     seed()

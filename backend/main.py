@@ -123,3 +123,18 @@ def create_expense(expense_in: ExpenseCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(db_expense)
     return db_expense
+
+
+@app.get("/analytics/anomalies", response_model=List[ExpenseResponse])
+def get_anomalies(db: Session = Depends(get_db)):
+    """
+    Returns list of all flagged anomaly expenses, newest first.
+    """
+    anomalies = (
+        db.query(Expense)
+        .filter(Expense.is_anomaly == True)
+        .order_by(Expense.date.desc(), Expense.id.desc())
+        .all()
+    )
+    return anomalies
+

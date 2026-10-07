@@ -91,10 +91,14 @@ export default function ExpenseList({ expenses = [], isLoading = false }) {
                 return (
                   <tr
                     key={expense.id}
-                    className="hover:bg-slate-700/30 transition group"
+                    className={`transition group ${
+                      expense.is_anomaly
+                        ? 'bg-rose-950/20 hover:bg-rose-950/35 border-l-4 border-l-rose-500'
+                        : 'hover:bg-slate-700/30'
+                    }`}
                   >
-                    <td className="py-3.5 pl-2 font-medium">
-                      <div className="flex items-center gap-2">
+                    <td className="py-3.5 pl-3 font-medium">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span
                           className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${categoryClass}`}
                         >
@@ -111,9 +115,10 @@ export default function ExpenseList({ expenses = [], isLoading = false }) {
                         )}
                       </div>
                       {expense.is_anomaly && expense.anomaly_explanation && (
-                        <p className="text-[11px] text-amber-300/90 mt-1 pl-1">
-                          {expense.anomaly_explanation}
-                        </p>
+                        <div className="mt-1.5 flex items-start gap-1.5 px-2 py-1.5 rounded-lg bg-slate-950/80 border border-amber-500/30 text-[11px] text-amber-200 leading-relaxed shadow-sm">
+                          <span className="text-amber-400 text-xs shrink-0 select-none">⚠️</span>
+                          <span>{expense.anomaly_explanation}</span>
+                        </div>
                       )}
                     </td>
 
